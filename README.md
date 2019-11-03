@@ -1,4 +1,3 @@
-# DSP
-DSP Homework
-
-May be error
+some bug！
+Goertzel 求解 DTMF
+Genetic BG
