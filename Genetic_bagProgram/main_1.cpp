@@ -4,6 +4,7 @@
 #include <ctime>
 #include <iomanip>
 #include <random>
+#include <algorithm>
 #include <cassert>
 
 using namespace std;
@@ -48,12 +49,17 @@ vector<vector<int>> datas = {  // goods datas
 };
 /*------------------Parameters------------------*/
 const int GOODS_COUNT = int(datas.size());
-int ITERATOR = 20;
-const long POPULATION_SIZE = 60;
+int ITERATOR = 30;
+const long POPULATION_SIZE = 1000;
 
 const int VOLUME_LIMIT = 80;
 const int WEIGHT_LIMIT = 80;
 /*--------------------------------------------*/
+
+mt19937 Rand(time(NULL));
+double rand_zero2one() {  // 0 ~ 1
+	return (Rand() % 100 / 100.);
+}
 
 
 class Goods {
@@ -85,15 +91,15 @@ public:
 
 		int _sum_volume = 0, _sum_weight = 0, _sum_value = 0;
 		double pGene = 0;  // 随机生成的概率 0~1
-		const double pThreshold = 0.6;  // 概率阈值 大于该阈值置为1，否则为0
+		const double pThreshold = 0.7;  // 概率阈值 大于该阈值置为1，否则为0
 
-		Chromosome _chromosome[60];
+		Chromosome _chromosome[1000];
 		// Chromosome _chromosome[_population_size]; // Can't use in VC, but gcc
 		for (long i = 0; i < _population_size; ++i) {
 			_chromosome[i].set_num_gene(_chromosome_size);
 			_sum_value = 0, _sum_volume = 0, _sum_weight = 0;
 			for (int j = 0; j < _chromosome_size; j++) {
-				pGene = abs((double(rand()) / (double(RAND_MAX) + 1)));
+				pGene = rand_zero2one();
 				_chromosome[i].set_gene(((pGene > pThreshold) ? 1 : 0));
 				
 				if (_chromosome[i].get_gene_item(j) == 1) {
@@ -109,18 +115,13 @@ public:
 				continue;
 			}
 
-			//cout << i << "  " << _sum_value << "  " << _sum_volume << "  " << _sum_weight << "  ";
-			//for (int j = 0; j < _chromosome_size; j++) {
-			//	cout << _chromosome[i].get_gene_item(j);
-			//	if ((j + 1) % 32 == 0) cout << endl;
-			//}
 			_population.push_back(_chromosome[i]);
 		}
 	}
 
-	double pCROSS = 0.8;  // 交叉概率
+	double pCROSS = 0.5;  // 交叉概率
 	double pMUTATION = 0.1;  // 变异概率
-
+	
 	class Chromosome {
 	public:
 		Chromosome() : _nums_gene(0), _fitness(0), selectProbability(0) {}
@@ -128,6 +129,8 @@ public:
 		double selectProbability;
 
 		void set_num_gene(int chromosone_size) { _nums_gene = chromosone_size; }
+		int get_num_gene() { return _nums_gene; }
+		
 		void empty_genes() { vector<int>().swap(_gene); }
 
 		void set_gene(int gene) { _gene.push_back(gene); }
@@ -137,14 +140,14 @@ public:
 		void set_gene_item(int index, int vaule) { _gene[index] = vaule; }
 
 		void set_fitness(int fitness) { _fitness = fitness; }
-		int get_fitness() { return _fitness; }
+		const int get_fitness() const { return _fitness; }
 
 		void set_constraint(int volume, int weight) {
 			vector<int>().swap(_constraint);  // empty
 			_constraint.push_back(volume);
 			_constraint.push_back(weight);
 		}
-		int get_constraint(string element) { 
+		const int get_constraint(string element) { 
 			if (element == "volume") {
 				return _constraint[0];
 			}
@@ -164,6 +167,10 @@ public:
 		vector<int> _constraint;  // 约束：sum_Volume and sum_Weight
 	};
 
+	static bool sort_chromosome(const Chromosome& one, const Chromosome& two) {
+		return (one.get_fitness() < two.get_fitness());
+	}
+
 	void fitness(vector<Chromosome>& population, vector<Goods>& _task) {
 		unsigned int value_sum = 0, volume_sum = 0, weight_sum = 0;
 		int gene_index = 0;
@@ -180,12 +187,25 @@ public:
 			}
 
 			/* Calculate fitness */
-			chromosome.set_fitness(value_sum);
 			chromosome.set_constraint(volume_sum, weight_sum);
+			if ((volume_sum > VOLUME_LIMIT) || (weight_sum > WEIGHT_LIMIT)) {
+				chromosome.set_fitness(-1);
+			}
+			else {
+				chromosome.set_fitness(value_sum);
+			}
 		}
 	}
 
 	void filter(vector<Chromosome>& population) {
+
+		stable_sort(population.begin(), population.end(), sort_chromosome);  // 按fitness从小到大排序
+		/* 保留前10%个体 */
+		vector<Chromosome> new_population;
+		for (int i = 0; i < int(0.1 * population.size()); i++) {
+			new_population.push_back(population.back());
+			population.pop_back();
+		}
 
 		long sum_fitness = 0;  // 计算概率值
 		for (auto& chromosome : population) {
@@ -196,35 +216,25 @@ public:
 			chromosome.selectProbability = double(chromosome.get_fitness()) / double(sum_fitness);
 		}
 
-		double dropout;
+		double dropout = 0;
 		double cumulativeProbability;  // 累计概率
-		long offset;
+		long offset = 0;
 
-		long num_dropout = long(0.4 * population.size());
-		for (long i = 0; i < num_dropout; ++i) {
-			dropout = abs((double(rand()) / (double(RAND_MAX) + 1)));  //随机选中的概率 0~1
+		for (long i = 0; i < (0.4 * population.size()); i++) {
+			dropout = rand_zero2one();  //随机选中的概率 0~1
 			cumulativeProbability = 0;
 			offset = 0;
 			for (auto& chromosome : population) {
 				cumulativeProbability += chromosome.selectProbability;
-				if ((chromosome.get_constraint("volume") > VOLUME_LIMIT) || 
-					(chromosome.get_constraint("weight") > WEIGHT_LIMIT) || 
-					(chromosome.get_fitness() < 0)) {
-					population.erase(population.begin() + offset);
-					break;
-				}
 				if (cumulativeProbability >= dropout) {
-					if (chromosome.get_fitness() > 80) {  //如果该个体的适应度(fitness)大于80则不进行筛选直接进入下一轮
-						i--;
-						break;
-					}
-
-					population.erase(population.begin() + offset);
+					new_population.push_back(population[offset]);
 					break;
 				}
 				offset++;
 			}
 		}
+		population.clear();
+		population = new_population;
 	}
 
 	void cross(vector<Chromosome>& population) {
@@ -232,63 +242,70 @@ public:
 		double corssProbability;
 		int index = 0;
 		int nGeneExchange = 0;  // 基因交换次数 1~3
-		int gene_index = 0;  // 交换基因的索引
-		int gene_temp = 0;  //  交换基因临时变量
+		int gene_index = 0;     // 交换基因的索引
+		int gene_temp = 0;      // 交换基因临时变量
 
-		vector<Chromosome> tempPopulation;  //TODO
+		vector<Chromosome> new_population;  //TODO
 
 		for (auto& chromosome : population) {
-			corssProbability = abs((double(rand()) / (double(RAND_MAX) + 1)));
+			corssProbability = rand_zero2one();
 			if (corssProbability < pCROSS) {
-				if (chromosome.get_fitness() > 80) {  //如果该个体的适应度(fitness)大于80则该染色体保留副本
-					tempPopulation.push_back(chromosome);
+				if (chromosome.get_fitness() > 100) {  //如果该个体的适应度(fitness)大于90则该染色体保留副本
+					new_population.push_back(chromosome);
 				}
 
 				if (first < 0) first = index;
 				else {
-					nGeneExchange = int((rand() % 3) + 1);
+					Chromosome newChromosome1 = population[first];
+					Chromosome newChromosome2 = population[index];
+					nGeneExchange = Rand() % 3 + 1;
 					for (int i = 0; i < nGeneExchange; i++) {
-						gene_index = int(rand() % chromosome.get_gene().size());
-						gene_temp = population[first].get_gene_item(gene_index);
-						population[first].set_gene_item(gene_index, population[index].get_gene_item(gene_index));
-						population[index].set_gene_item(gene_index, gene_temp);
+						gene_index = Rand() % chromosome.get_gene().size();
+						for (int j = gene_index; j < chromosome.get_num_gene(); j++) {
+							gene_temp = newChromosome1.get_gene_item(gene_index);
+							newChromosome1.set_gene_item(gene_index, newChromosome2.get_gene_item(gene_index));
+							newChromosome2.set_gene_item(gene_index, gene_temp);
+						}
 					}
+					new_population.push_back(newChromosome1);
+					new_population.push_back(newChromosome2);
 					first = -1;
 				}
 			}
 			index++;
 		}
 
-		for (auto& chromosome : tempPopulation) {
+		for (auto& chromosome : new_population) {
 			population.push_back(chromosome);
 		}
 	}
 
 	void mutation(vector<Chromosome>& population) {
 		double mutationProbability;  // 基因变异概率
-		int nMutation;  // 基因变异的数量
-		int mutationGene;  // 变异的基因
+		int nMutation;               // 基因变异的数量
+		int mutationGene;            // 变异的基因
 
-		vector<Chromosome> tempPopulation;  // TODO
+		vector<Chromosome> new_population;  // TODO
 
 		for (auto& chromosome : population) {
 
-			mutationProbability = abs((double(rand()) / (double(RAND_MAX) + 1)));
-			if (mutationProbability < pMUTATION) {
-				if (chromosome.get_fitness() > 80) {  //如果该个体的适应度(fitness)大于80则该染色体保留副本
-					tempPopulation.push_back(chromosome);
-				}
+			if (chromosome.get_fitness() > 100) {  //如果该个体的适应度(fitness)大于80则该染色体保留副本
+				new_population.push_back(chromosome);
+			}
 
-				nMutation = rand() % chromosome.get_gene().size() + 1;
-				for (int i = 0; i < nMutation; i++) {
-					mutationGene = rand() % chromosome.get_gene().size();
-					chromosome.set_gene_item(mutationGene,
-						int(1 - chromosome.get_gene_item(mutationGene)));
+			//nMutation = Rand() % chromosome.get_gene().size() + 1;
+			nMutation = 32;
+			for (int i = 0; i < nMutation; i++) {
+				mutationProbability = rand_zero2one();
+				if (mutationProbability < pMUTATION) {
+					//mutationGene = rand() % chromosome.get_gene().size();
+					chromosome.set_gene_item(i,
+						int(1 - chromosome.get_gene_item(i)));
 				}
 			}
 		}
 
-		for (auto& chromosome : tempPopulation) {
+		for (auto& chromosome : new_population) {
 			population.push_back(chromosome);
 		}
 	}
@@ -296,11 +313,9 @@ public:
 	Chromosome get_best(vector<Chromosome>& population) {
 		Chromosome best;
 		for (auto& chromosome : population) {
-			//if ((chromosome.get_constraint("volume") < 81) && (chromosome.get_constraint("weight") < 81)) {
-				if (chromosome.get_fitness() > best.get_fitness()) {
-					best = chromosome;
-				}
-			//}
+			if (chromosome.get_fitness() > best.get_fitness()) {
+				best = chromosome;
+			}
 		}
 		return best;
 	}
@@ -370,9 +385,8 @@ private:
 };
 
 
-
 int main() {
-
+	
 	/*-----------------Get 32 goods---------------*/
 	Goods goods[32];
 	// Goods goods[GOODS_COUNT];  // Can't use in VC, but gcc
