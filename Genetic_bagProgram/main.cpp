@@ -49,7 +49,7 @@ vector<vector<int>> datas = {  // goods datas
 };
 /*------------------Parameters------------------*/
 const int GOODS_COUNT = int(datas.size());
-int ITERATOR = 30;
+int ITERATOR = 100;
 const long POPULATION_SIZE = 1000;
 
 const int VOLUME_LIMIT = 80;
@@ -220,17 +220,15 @@ public:
 		double cumulativeProbability;  // 累计概率
 		long offset = 0;
 
-		for (long i = 0; i < (0.4 * population.size()); i++) {
+		for (long i = 0; i < 0.4 * population.size(); i++) {
 			dropout = rand_zero2one();  //随机选中的概率 0~1
 			cumulativeProbability = 0;
-			offset = 0;
 			for (auto& chromosome : population) {
 				cumulativeProbability += chromosome.selectProbability;
 				if (cumulativeProbability >= dropout) {
-					new_population.push_back(population[offset]);
+					new_population.push_back(chromosome);
 					break;
 				}
-				offset++;
 			}
 		}
 		population.clear();
@@ -238,41 +236,27 @@ public:
 	}
 
 	void cross(vector<Chromosome>& population) {
-		int first = -1;
 		double corssProbability;
-		int index = 0;
-		int nGeneExchange = 0;  // 基因交换次数 1~3
-		int gene_index = 0;     // 交换基因的索引
+		//int gene_index = 0;     // 交换基因的索引
 		int gene_temp = 0;      // 交换基因临时变量
 
 		vector<Chromosome> new_population;  //TODO
 
-		for (auto& chromosome : population) {
-			corssProbability = rand_zero2one();
-			if (corssProbability < pCROSS) {
-				if (chromosome.get_fitness() > 100) {  //如果该个体的适应度(fitness)大于90则该染色体保留副本
-					new_population.push_back(chromosome);
-				}
-
-				if (first < 0) first = index;
-				else {
-					Chromosome newChromosome1 = population[first];
-					Chromosome newChromosome2 = population[index];
-					nGeneExchange = Rand() % 3 + 1;
-					for (int i = 0; i < nGeneExchange; i++) {
-						gene_index = Rand() % chromosome.get_gene().size();
-						for (int j = gene_index; j < chromosome.get_num_gene(); j++) {
-							gene_temp = newChromosome1.get_gene_item(gene_index);
-							newChromosome1.set_gene_item(gene_index, newChromosome2.get_gene_item(gene_index));
-							newChromosome2.set_gene_item(gene_index, gene_temp);
-						}
-					}
-					new_population.push_back(newChromosome1);
-					new_population.push_back(newChromosome2);
-					first = -1;
+		//for (auto& chromosome : population) {
+		for (int k = 0; k < population.size() - 1; k += 2) {
+			Chromosome newChromosome1 = population[k];
+			Chromosome newChromosome2 = population[k + 1];
+			
+			for (int j = 0; j < 32; j++) {
+				corssProbability = rand_zero2one();
+				if (corssProbability <= pCROSS) {
+					gene_temp = newChromosome1.get_gene_item(j);
+					newChromosome1.set_gene_item(j, newChromosome2.get_gene_item(j));
+					newChromosome2.set_gene_item(j, gene_temp);
 				}
 			}
-			index++;
+			new_population.push_back(newChromosome1);
+			new_population.push_back(newChromosome2);
 		}
 
 		for (auto& chromosome : new_population) {
@@ -282,31 +266,18 @@ public:
 
 	void mutation(vector<Chromosome>& population) {
 		double mutationProbability;  // 基因变异概率
-		int nMutation;               // 基因变异的数量
-		int mutationGene;            // 变异的基因
-
-		vector<Chromosome> new_population;  // TODO
 
 		for (auto& chromosome : population) {
-
-			if (chromosome.get_fitness() > 100) {  //如果该个体的适应度(fitness)大于80则该染色体保留副本
-				new_population.push_back(chromosome);
-			}
-
-			//nMutation = Rand() % chromosome.get_gene().size() + 1;
-			nMutation = 32;
-			for (int i = 0; i < nMutation; i++) {
-				mutationProbability = rand_zero2one();
-				if (mutationProbability < pMUTATION) {
-					//mutationGene = rand() % chromosome.get_gene().size();
-					chromosome.set_gene_item(i,
-						int(1 - chromosome.get_gene_item(i)));
+			mutationProbability = rand_zero2one();
+			if (mutationProbability < pMUTATION) {
+				for (int i = 0; i < chromosome.get_num_gene(); i++) {
+					mutationProbability = rand_zero2one();
+					if (mutationProbability < pMUTATION) {
+						chromosome.set_gene_item(i, int(1 - chromosome.get_gene_item(i)));
+					}
 				}
 			}
-		}
 
-		for (auto& chromosome : new_population) {
-			population.push_back(chromosome);
 		}
 	}
 
@@ -376,10 +347,10 @@ public:
 	}
 
 private:
-	int _iterator;          // 迭代次数
-	int _chromosome_size;   // 物体总数
-	long _population_size;  // 种群数量
-	vector<Chromosome> _population; 
+	int _iterator;                    // 迭代次数
+	int _chromosome_size;             // 物体总数
+	long _population_size;            // 种群数量
+	vector<Chromosome> _population;   
 	vector<Goods> _task;
 	vector<Chromosome> Bestes;
 };
@@ -399,11 +370,6 @@ int main() {
 		task.push_back(goods[goods_index]);
 		goods_index++;
 	}
-	//int i = 0;
-	//for (auto& t : task) {
-	//	cout << i << "  " << t.get_value() << "  " << t.get_volume() << "  " << t.get_weight() << endl;
-	//	i++;
-	//}
 	/*--------------------------------------------*/
 
 	GA genetic(GOODS_COUNT, POPULATION_SIZE, ITERATOR, task);
