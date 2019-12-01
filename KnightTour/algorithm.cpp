@@ -21,53 +21,24 @@ void DFS::sort_index(vector<vector<int>>& nRoad) {
 	std::sort(nRoad.begin(), nRoad.end());
 }
 
-//void DFS::sort_direction(int x, int y) {
-//	int x_next=0, y_next=0;
-//	int x_next_next=0, y_next_next=0;
-//	init_nRoad(_nRoad);
-//
-//	int count = 0;
-//	for (int i = 0; i < CHESS_SIZE; i++) {  
-//		count = 0;
-//		x_next = x + _move[i][0];
-//		y_next = y + _move[i][1];
-//
-//		if (check(x_next, y_next)) {
-//			for (int j = 0; j < CHESS_SIZE; j++) {
-//				x_next_next = x_next + _move[j][0];
-//				y_next_next = y_next + _move[j][1];
-//				if (check(x_next_next, y_next_next)) {
-//					count++;
-//				}  
-//			}
-//		}
-//		else count = 99;
-//		_nRoad[i][0] = count;
-//	}
-//	sort_index(_nRoad);
-//}
-
-
 void DFS::sort_direction(int x, int y) {
-	int x_next = 0, y_next = 0;
-	int x_next_next = 0, y_next_next = 0;
+	int x_next=0, y_next=0;
+	int x_next_next=0, y_next_next=0;
 	init_nRoad(_nRoad);
 
 	int count = 0;
-	for (int i = 0; i < CHESS_SIZE; i++) {
+	for (int i = 0; i < CHESS_SIZE; i++) {  
 		count = 0;
 		x_next = x + _move[i][0];
 		y_next = y + _move[i][1];
 
 		if (check(x_next, y_next)) {
-			std::thread road0();
-
 			for (int j = 0; j < CHESS_SIZE; j++) {
 				x_next_next = x_next + _move[j][0];
 				y_next_next = y_next + _move[j][1];
 				if (check(x_next_next, y_next_next)) {
 					count++;
-				}
+				}  
 			}
 		}
 		else count = 99;
@@ -86,10 +57,10 @@ void DFS::run(int x, int y, int deep) {
 	}
 	if (flag) return;
 
-	sort_direction(x, y);  // ¶Ô°Ë¸ö·½Ïò½øÐÐÅÅÐò
+	sort_direction(x, y);  // å¯¹å…«ä¸ªæ–¹å‘è¿›è¡ŒæŽ’åº
 	
 	int x_next=0, y_next=0;
-	for (int i = 0; i < 8; i++) {  // °Ë¸ö·½Ïò
+	for (int i = 0; i < 8; i++) {  // å…«ä¸ªæ–¹å‘
 		x_next = x + _move[_nRoad[i][1]][0];
 		y_next = y + _move[_nRoad[i][1]][1];
 
